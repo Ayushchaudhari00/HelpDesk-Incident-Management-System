@@ -1,0 +1,44 @@
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok' | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./Helpdesk Incident -backend/Helpdesk-Incident-Management-System
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      SPRING_MONGODB_URI: mongodb://mongo:27017/helpdesk_db
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@helpdesk.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in a root .env file}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in a root .env file}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./Helpdesk Incident -FrontEnd/HelpDesk-FrontEnd
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  mongodb_data:
